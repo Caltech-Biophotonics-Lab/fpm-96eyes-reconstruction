@@ -19,50 +19,44 @@ using namespace Halide;
  * @param[in] vmax max value of X [255 for uint8 (default), 65535 for uint16]
  * @return integer vector
  */
-Func
-adjust_brightness(const Func im, Expr gamma, Expr vmin = 0, Expr vmax = 255) ;
+Func adjustBrightness(const Func im, Expr gamma, Expr vmin = 0, Expr vmax = 255);
 
-Func
-norm1(const Func im, const RDom& r) ;
+Func norm1(const Func im, const RDom& r);
 
-Func
-norm2Squared(const Func im, const RDom& r) ;
+Func norm2Squared(const Func im, const RDom& r);
 
 template <typename F>
-std::pair<F, Func>
-applyCheckerboard(const F& im);
+std::pair<F, Func> applyCheckerboard(const F& im);
 
-std::pair<ComplexFunc, ComplexFunc>
-shiftAndMask(const Func im, const Func offset, const ComplexFunc mask, const int tile_size);
+std::pair<ComplexFunc, ComplexFunc> shiftAndMask(const Func im, const Func offset,
+                                                 const ComplexFunc mask, const int tile_size);
 
 // First order update, variable step size
-ComplexFunc
-epryGradientDescent(const ComplexFunc p, const ComplexFunc q, Expr alpha, Expr delta,
-                    const ComplexFunc in);
+ComplexFunc epryGradientDescent(const ComplexFunc p, const ComplexFunc q, Expr alpha, Expr delta,
+                                const ComplexFunc in);
 
 // First order update, constant step size
-ComplexFunc
-epryGradientDescent(const ComplexFunc p, const ComplexFunc q, Expr alpha_squared,
-                    const ComplexFunc in);
+ComplexFunc epryGradientDescent(const ComplexFunc p, const ComplexFunc q, Expr alpha_squared,
+                                const ComplexFunc in);
 
-ComplexFunc
-epryPseudoNewton(const ComplexFunc p, const ComplexFunc q, Expr alpha, Expr delta,
-                 const ComplexFunc in);
+ComplexFunc epryPseudoNewton(const ComplexFunc p, const ComplexFunc q, Expr alpha, Expr delta,
+                             const ComplexFunc in);
 
-Func
-hotPixelSuppression(const Func input);
+Func hotPixelSuppression(const Func input);
 
 /** Deinterleave and fuse two Bayer images to one RGB image. */
-Func
-deinterleave(const Func raw_green, const Func raw_red);
+Func deinterleave(const Func raw_green, const Func raw_red);
+
+/** Deinterleave and interpolate the Green channel */
+std::pair<Func, Func> deinterleaveGreen(const Func& raw, const Expr width, const Expr height);
 
 template <typename T>
 std::tuple<ComplexFunc, Func, Func>
 fft2C2C(const T& input, const int width, bool is_fwd = true, std::string&& label = "input_mux") {
+    using vars::i;
+    using vars::k;
     using vars::x;
     using vars::y;
-    using vars::k;
-    using vars::i;
 
     Func fft2_internal{is_fwd ? "fft2_mux" : "ifft2_mux"};
 

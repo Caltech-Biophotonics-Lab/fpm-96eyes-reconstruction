@@ -1,4 +1,5 @@
 #include "linear_ops.h"
+
 #include "types.h"
 #include "vars.hpp"
 
@@ -14,12 +15,12 @@ using namespace types;
 using namespace Halide;
 
 Func
-adjust_brightness(const Func im, Expr gamma, Expr vmin, Expr vmax) {
+adjustBrightness(const Func im, Expr gamma, Expr vmin, Expr vmax) {
     Func gamma_adjusted{"gamma_adjusted"};
 
     const Expr vrange = vmax - vmin;
-    gamma_adjusted(x, y, k) =
-        select(x <= vmin, 0, pow(cast<float>(im(x, y) - vmin) / vrange, 1.0f / gamma) * 65535.0f);
+    gamma_adjusted(x, y, k) = select(
+        x <= vmin, 0, pow(cast<float>(im(x, y, k) - vmin) / vrange, 1.0f / gamma) * 65535.0f);
 
     return gamma_adjusted;
 }
@@ -137,5 +138,19 @@ deinterleave(const Func raw_green, const Func raw_red) {
                0);
 
     return deinterleaved;
+}
+
+std::pair<Func, Func>
+deinterleaveGreen(const Func& raw, Expr width, Expr height) {
+    auto clamped = BoundaryConditions::repeat_edge(raw, {{0, width}, {0, height}});
+
+    const Expr has_value = (x + y) % 2 == 0;
+    const Expr interpolated_value = (clamped(x + 1, y, k) + clamped(x, y + 1, k) +
+                                     clamped(x - 1, y, k) + clamped(x, y - 1, k)) /
+                                    4;
+
+    Func deinterleaved{"deinterleaved"};
+    deinterleaved(x, y, k) = select(has_value, raw(x, y, k), interpolated_value);
+    return {deinterleaved, clamped};
 }
 }  // namespace linear_ops

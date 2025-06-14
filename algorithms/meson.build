@@ -23,6 +23,7 @@ halide_codegen_exe = executable('codegen',
         'src/fpm-epry_design.cpp',
         'src/fpm-epry_impl.cpp',
         'src/high-res-init_generator.cpp',
+        'src/low-res-init_generator.cpp',
         'src/linear_ops.cpp',
     ],
     dependencies: [
@@ -31,6 +32,7 @@ halide_codegen_exe = executable('codegen',
 )
 
 halide_pipelines = [
+    {'name': 'low_res_init'},
     {'name': 'plls'},
     {'name': 'get_phase'},
     {'name': 'raw2bgr'}, {
@@ -41,7 +43,7 @@ halide_pipelines = [
         'name': 'high_res_init',
         'auto_schedule': false,
         'specify_tile_size': false,
-    }
+    },
 ]
 
 tile_size = 256

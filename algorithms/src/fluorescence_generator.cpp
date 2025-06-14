@@ -5,7 +5,6 @@
 
 namespace {
 
-
 using namespace Halide;
 using vars::c;
 using vars::x;
