@@ -22,16 +22,23 @@ FPMEpry::setBounds() {
     k_offset.dim(0).set_bounds(0, 2).set_stride(1);
     k_offset.dim(1).set_bounds(0, n_slides).set_stride(2);
 
-    const auto setComplexBound = [=](auto& p, const int w) {
-        p.dim(0).set_bounds(0, 2).set_stride(1);
-        p.dim(1).set_bounds(0, w).set_stride(2);
-        p.dim(2).set_bounds(0, w).set_stride(2 * w);
+    const auto setComplexBound = [=](auto& p, const int w, bool demux_real_imag) {
+        if (demux_real_imag) {
+            p.dim(0).set_bounds(0, w).set_stride(1);
+            p.dim(1).set_bounds(0, w).set_stride(w);
+            p.dim(2).set_bounds(0, 2).set_stride(w * w);
+
+        } else {
+            p.dim(0).set_bounds(0, 2).set_stride(1);
+            p.dim(1).set_bounds(0, w).set_stride(2);
+            p.dim(2).set_bounds(0, w).set_stride(2 * w);
+        }
     };
 
-    setComplexBound(high_res_prev, W2);
-    setComplexBound(high_res_new, W2);
-    setComplexBound(pupil_prev, W);
-    setComplexBound(pupil_new, W);
+    setComplexBound(high_res_prev, W2, true);
+    setComplexBound(high_res_new, W2, true);
+    setComplexBound(pupil_prev, W, false);
+    setComplexBound(pupil_new, W, false);
 }
 
 void
@@ -42,9 +49,9 @@ FPMEpry::implementation() {
     if (using_autoscheduler()) {
         k_offset.set_estimates({{0, 2}, {0, n_illumination}});
 
-        high_res_prev.set_estimates({{0, 2}, {0, W2}, {0, W2}});
+        high_res_prev.set_estimates({{0, W2}, {0, W2}, {0, 2}});
 
-        high_res_new.set_estimates({{0, 2}, {0, W2}, {0, W2}});
+        high_res_new.set_estimates({{0, W2}, {0, W2}, {0, 2}});
 
         pupil_prev.set_estimates({{0, 2}, {0, W}, {0, W}});
 

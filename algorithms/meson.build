@@ -23,6 +23,7 @@ halide_codegen_exe = executable('codegen',
         'src/fpm-epry_design.cpp',
         'src/fpm-epry_impl.cpp',
         'src/high-res-init_generator.cpp',
+        'src/high-res-restore_generator.cpp',
         'src/low-res-init_generator.cpp',
         'src/linear_ops.cpp',
     ],
@@ -43,6 +44,10 @@ halide_pipelines = [
         'name': 'high_res_init',
         'auto_schedule': false,
         'specify_tile_size': false,
+    }, {
+        'name': 'high_res_restore',
+        'auto_schedule': false,
+        'specify_tile_size': false,
     },
 ]
 
@@ -53,7 +58,7 @@ halide_generated_bin = {}
 foreach p : halide_pipelines
     if p.has_key('auto_schedule') and not p['auto_schedule']
         halide_codegen_args = [
-            'target=host-cuda-cuda_capability_75-no_asserts',
+            'target=host-cuda-cuda_capability_75',
         ]
     else
         halide_codegen_args = [

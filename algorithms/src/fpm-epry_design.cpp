@@ -58,13 +58,17 @@ normInf(const ComplexFunc input, const RDom& r, const std::string& label) {
 
 std::pair<ComplexFunc, ComplexFunc>
 updateHR(const ComplexFunc& high_res, const ComplexFunc& f_difference, const ComplexFunc& pupil,
-         const Func& offset, const Expr alpha, const int32_t k, const Expr width) {
-    const Expr pupil_sumsq = re(pupil(x, y)) * re(pupil(x, y)) + im(pupil(x, y)) * im(pupil(x, y));
-    Func scale_factor{"scale_factor_newton"};
-    scale_factor(x, y) = sqrt(pupil_sumsq) / (pupil_sumsq + 1e-6f) / alpha;
+         const Func& offset, const Expr alpha, const int32_t k, const Expr width,
+         const float eps = 1e-6f) {
+    Func pupil_sumsq{"pupil_sumsq"};
+    pupil_sumsq(x, y) = re(pupil(x, y) * conj(pupil(x, y)));
+
+    // Step size of the pseudo-Newton update
+    Func step_size{"step_size_newton"};
+    step_size(x, y) = sqrt(pupil_sumsq(x, y)) / (pupil_sumsq(x, y) + eps) / alpha;
 
     ComplexFunc delta{"delta"};
-    delta(x, y) = scale_factor(x, y) * conj(pupil(x, y)) * f_difference(x, y);
+    delta(x, y) = step_size(x, y) * conj(pupil(x, y)) * f_difference(x, y);
 
     const Expr in_x_range = (x >= offset(X, k)) && (x < (offset(X, k) + width));
     const Expr in_y_range = (y >= offset(Y, k)) && (y < (offset(Y, k) + width));
@@ -73,8 +77,12 @@ updateHR(const ComplexFunc& high_res, const ComplexFunc& f_difference, const Com
     const Expr new_x = clamp(x - offset(X, k), 0, width - 1);
     const Expr new_y = clamp(y - offset(Y, k), 0, width - 1);
 
-    high_res_new(x, y) = select(  //
-        in_x_range && in_y_range, high_res(x, y) - delta(new_x, new_y), high_res(x, y));
+    // Halide language always assumes an infinite area of (optical conjugate)
+    // planes. Pass though unchanged values.
+    high_res_new(x, y) = select(               //
+        in_x_range && in_y_range,              //
+        high_res(x, y) - delta(new_x, new_y),  //
+        high_res(x, y));
 
     return {high_res_new, delta};
 }
@@ -82,14 +90,18 @@ updateHR(const ComplexFunc& high_res, const ComplexFunc& f_difference, const Com
 ComplexFunc
 updatePupil(const ComplexFunc& current_pupil, const ComplexFunc& f_difference,
             const ComplexFunc& f_object, const Expr beta, const Expr weight = 1e-6f) {
-    const Expr f_object_sumsq =
-        re(f_object(x, y)) * re(f_object(x, y)) + im(f_object(x, y)) * im(f_object(x, y));
-    Func scale_factor{"scale_factor_lerp"};
-    scale_factor(x, y) = fast_inverse(lerp(beta, sqrt(f_object_sumsq), weight));
+    constexpr auto Abs = [](ComplexExpr v) { return sqrt(re(v * conj(v))); };
+
+    Func f_object_magn{"f_object_magn"};
+    f_object_magn(x, y) = Abs(f_object(x, y));
+
+    // Step size normalized by the power spectrum intensity.
+    Func step_size{"step_size_epry"};
+    step_size(x, y) = fast_inverse(lerp(beta, f_object_magn(x, y), weight));
 
     ComplexFunc new_pupil{"pupil"};
     new_pupil(x, y) =
-        current_pupil(x, y) - scale_factor(x, y) * conj(f_object(x, y)) * f_difference(x, y);
+        current_pupil(x, y) - step_size(x, y) * conj(f_object(x, y)) * f_difference(x, y);
 
     return new_pupil;
 }
@@ -102,10 +114,11 @@ FPMEpry::design() {
     const int width = tile_size;
 
     {
+        using namespace types;
         // Initialize the high resolution image in Fourier domain.
         high_res.resize(n_illumination + 1);
         ComplexFunc h{"high_res"};
-        h(x, y) = {high_res_prev(0, x, y), high_res_prev(1, x, y)};
+        h(x, y) = {high_res_prev(x, y, RE), high_res_prev(x, y, IM)};
         high_res.front() = std::move(h);
     }
 
@@ -117,10 +130,12 @@ FPMEpry::design() {
     }
 
     {
-        // Initial the pupil function.
+        using namespace types;
+
+        // Initialize the pupil function.
         pupil.reserve(fpm_mode == AUTO_BRIGHTNESS ? 1 : n_illumination);
         ComplexFunc p{"pupil"};
-        p(x, y) = {pupil_prev(0, x, y), pupil_prev(1, x, y)};
+        p(x, y) = {pupil_prev(RE, x, y), pupil_prev(IM, x, y)};
         pupil.emplace_back(std::move(p));
     }
 
@@ -153,12 +168,16 @@ FPMEpry::design() {
         const auto [replaced, magn_low_res] =
             replaceIntensity(estimated, low_res, illumination_idx);
 
+        // Compensate the FFT gain
+        ComplexFunc normalized{"normalized"};
+        normalized(x, y) = replaced(x, y) / tile_size / tile_size;
+
         // Simulate the Fourier plane.
         ComplexFunc f_replaced;
         Func fft2;
         Func replaced_interleaved;
         std::tie(f_replaced, fft2, replaced_interleaved) =
-            fft2C2C(replaced, width, FORWARD, "replaced_interleaved");
+            fft2C2C(normalized, width, FORWARD, "replaced_interleaved");
 
         // Update the high resolution image in Fourier domain via backward
         // propagation.
@@ -224,7 +243,7 @@ FPMEpry::design() {
         f_difference.emplace_back(std::move(f_diff));
     }
 
-    high_res_new(i, x, y) = mux(i, {re(high_res.back()(x, y)), im(high_res.back()(x, y))});
+    high_res_new(x, y, i) = mux(i, {re(high_res.back()(x, y)), im(high_res.back()(x, y))});
     pupil_new(i, x, y) = mux(i, {re(pupil.back()(x, y)), im(pupil.back()(x, y))});
 }
 }  // namespace algorithms

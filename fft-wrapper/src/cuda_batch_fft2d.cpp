@@ -5,7 +5,7 @@
 CudaBatchFft2d::CudaBatchFft2d(unsigned batch, int width, int height) {
     if (batch > 1) {
         // Multi-plane 2D FFT
-        const int rank[] = {height, width};
+        const int rank[]{height, width};
 
         cufftErrchk(cufftPlanMany(&_plan, 2, const_cast<int*>(rank), nullptr, 0, 0, nullptr, 0, 0,
                                   CUFFT_C2C, batch),
@@ -20,8 +20,8 @@ CudaBatchFft2d::CudaBatchFft2d() : _plan{0} {}
 
 CudaBatchFft2d::~CudaBatchFft2d() {
     if (_plan == 0) return;
-    // cufftErrchk(cufftDestroy(_plan), "cufftDestroy");
-    //_plan = 0;
+    cufftErrchk(cufftDestroy(_plan), "cufftDestroy");
+    _plan = 0;
 }
 
 void

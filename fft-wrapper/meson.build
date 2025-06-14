@@ -29,3 +29,20 @@ cufft_wrapper_dep = declare_dependency(
         cuda_runtime_dep,
     ],
 )
+
+test_cufft_exe = executable('test-cufft',
+    sources: [
+        'tests/test-fft2.cpp',
+    ],
+    include_directories: common_inc,
+    dependencies: [
+        cufft_wrapper_dep,
+        catch2_dep,
+        armadillo_dep,
+    ],
+)
+
+test('CuFFT wrapper', test_cufft_exe,
+    args: ['-r', 'tap'],
+    protocol: 'tap',
+)

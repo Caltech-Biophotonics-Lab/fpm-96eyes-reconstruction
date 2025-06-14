@@ -2,3 +2,6 @@ build/
 subprojects/*/
 test-data/*.hdf5
 test-data/*.h5
+
+# exposing cuFFT handle as C-extern function
+**/extern_cufft.cpp

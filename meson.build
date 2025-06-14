@@ -35,6 +35,7 @@ subdir('fft-wrapper')
 
 # Image processing algorithms, potentially GPU-accelerated.
 subdir('algorithms')
+subdir('fpm-epry-runtime')
 
 # End user application
 subdir('apps')

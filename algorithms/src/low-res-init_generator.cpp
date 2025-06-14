@@ -12,13 +12,12 @@ using vars::k;
 using vars::x;
 using vars::y;
 
-constexpr auto W = constants::width;
-constexpr auto H = constants::height;
+constexpr auto T = constants::tile_size;
 
 /** Given a stack of 16-bit raw images, apply gamma correction. */
 class LowResInit : public Generator<LowResInit> {
    public:
-    Input<Buffer<const uint16_t, 3>> raw{"raw"};
+    Input<Buffer<const uint8_t, 3>> raw{"raw"};
     Input<float> gamma{"gamma", 0.5f, 0.2f, 1.0f};
     Output<Buffer<float, 3>> amplitude{"amplitude"};
 
@@ -28,26 +27,30 @@ class LowResInit : public Generator<LowResInit> {
    private:
     void setBounds();
 
-    Func repeated_edge;
-    Func interpolated;
+    Func average_brightness{"average_brightness"};
+    Func normalized{"normalized"};
 };
 
 void
 LowResInit::generate() {
-    std::tie(interpolated, repeated_edge) =
-        linear_ops::deinterleaveGreen(raw, raw.width(), raw.height());
-    amplitude = linear_ops::adjustBrightness(interpolated, gamma, 0.0f, 255.0f);
+    const RDom r{0, T, 0, T, "all_pixels"};
+    average_brightness(k) = 0.0f;
+    average_brightness(k) += raw(r.x, r.y, k);
+
+    normalized(x, y, k) = average_brightness(0) / average_brightness(k) * raw(x, y, k);
+
+    amplitude = linear_ops::adjustBrightness(normalized, gamma, 0.0f, 255.0f);
 }
 
 void
 LowResInit::setBounds() {
-    raw.dim(0).set_bounds(0, W).set_stride(1);
-    raw.dim(1).set_bounds(0, H).set_stride(W);
-    raw.dim(2).set_bounds(0, 2).set_stride(W * H);
+    raw.dim(0).set_bounds(0, T).set_stride(1);
+    raw.dim(1).set_bounds(0, T).set_stride(T);
+    raw.dim(2).set_min(0).set_stride(T * T);
 
-    amplitude.dim(0).set_bounds(0, W).set_stride(1);
-    amplitude.dim(1).set_bounds(0, H).set_stride(W);
-    amplitude.dim(2).set_bounds(0, 2).set_stride(W * H);
+    amplitude.dim(0).set_bounds(0, T).set_stride(1);
+    amplitude.dim(1).set_bounds(0, T).set_stride(T);
+    amplitude.dim(2).set_min(0).set_stride(T * T);
 }
 
 void
@@ -57,8 +60,9 @@ LowResInit::schedule() {
     setBounds();
 
     constexpr auto n_illuminations = 49;
-    raw.set_estimates({{0, W}, {0, H}, {0, n_illuminations}});
-    amplitude.set_estimates({{0, W}, {0, H}, {0, n_illuminations}});
+    raw.set_estimates({{0, T}, {0, T}, {0, n_illuminations}});
+    gamma.set_estimate(0.6f);
+    amplitude.set_estimates({{0, T}, {0, T}, {0, n_illuminations}});
 }
 
 }  // namespace

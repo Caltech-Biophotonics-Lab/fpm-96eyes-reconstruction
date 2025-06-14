@@ -51,12 +51,14 @@ SCENARIO("Can find wavevector by fixed-point iterations") {
                 }
 
                 AND_THEN("Valid wavevector values") {
-                    arma::umat all_offset(2, n_leds);
+                    using namespace arma;
+                    umat all_offset(2, n_leds);
                     for (auto i = 0; i < n_leds; i++) {
                         all_offset.col(i) = wavevector_engine.getOffset(i);
                     }
 
                     REQUIRE(all_offset.is_finite());
+                    // umat(trans(all_offset)).print("k_offset =");
                 }
             }
         }

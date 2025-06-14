@@ -62,6 +62,9 @@ applyCheckerboard(const F& im) {
     return {checkerboard, sign};
 }
 
+template std::pair<Func, Func> applyCheckerboard<Func>(const Func&);
+template std::pair<ComplexFunc, Func> applyCheckerboard<ComplexFunc>(const ComplexFunc&);
+
 std::pair<ComplexFunc, ComplexFunc>
 shiftAndMask(const Func im, const Func offset, const ComplexFunc mask, const int tile_size) {
     ComplexFunc shifted{"shifted"};
@@ -83,7 +86,6 @@ ComplexFunc
 epryGradientDescent(const ComplexFunc p, const ComplexFunc q, Expr alpha, Expr delta,
                     const ComplexFunc in) {
     const Expr magn = abs(p(x, y));
-
     const Expr w = lerp(magn, alpha, delta) * alpha;
 
     ComplexFunc epry{"epry"};
@@ -105,7 +107,7 @@ epryGradientDescent(const ComplexFunc p, const ComplexFunc q, Expr alpha_squared
 ComplexFunc
 epryPseudoNewton(const ComplexFunc p, const ComplexFunc q, Expr alpha, Expr delta,
                  const ComplexFunc in) {
-    const Expr sumsq = re(p(x, y)) * re(p(x, y)) + im(p(x, y)) * im(p(x, y));
+    const Expr sumsq = re(p(x, y) * conj(p(x, y)));
 
     const Expr w = sumsq / (sumsq * sumsq + delta) / alpha;
 
